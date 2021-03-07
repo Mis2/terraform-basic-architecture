@@ -13,6 +13,81 @@ resource "aws_vpc" "master_vpc" {
 
 resource "aws_subnet" "public_subnet" {
     vpc_id = "${ aws_vpc.master_vpc.id }"
-    cidr_block = "value"
+    cidr_block = "10.0.1.0/24"
+    map_public_ip_on_launch = true
+    availability_zone = "ap-south-1a"
+
+    tags = {
+        Name = "Public Subnet"
+        BuildWith = "terraform"
+    }
   
+}
+
+resource "aws_subnet" "private_subnet" {
+    vpc_id = "${ aws_vpc.master_vpc.id }"
+    cidr_block = "10.0.2.0/24"
+    map_public_ip_on_launch = true
+    availability_zone = "ap-south-1a"
+
+    tags = {
+        Name = "Private Subnet"
+        BuildWith = "terraform"
+    }
+  
+}
+resource "aws_internet_gateway" "internet_gateway" {
+    vpc_id = "${ aws_vpc.master_vpc.id }"
+
+    tags = {
+      "Name" = "Internet Gateway"
+      "BuildWith" = "terraform"
+    }
+  
+}
+
+resource "aws_route" "external_route" {
+    route_table_id = "${ aws_vpc.master_vpc.main_route_table_id }"
+    destination_cidr_block = "0.0.0.0/0"
+    gateway_id = "${ aws_internet_gateway.internet_gateway.id }"
+  
+}
+
+resource "aws_eip" "elastic_ip" {
+    vpc = true
+    depends_on = [ "aws_internet_gateway.internet_gateway" ]
+  
+}
+resource "aws_nat_gateway" "nat" {
+    allocation_id = "${ aws_eip.elastic_ip.id }"
+    subnet_id = "${ aws_subnet.public_subnet.id }"
+    depends_on = ["aws_internet_gateway.internet_gateway"]
+}
+
+resource "aws_route_table" "private_route_table" {
+  vpc_id = "${ aws_vpc.master_vpc.id }"
+
+  tags {
+    Name      = "Private Subnet Route Table"
+    BuildWith = "terraform"
+  }
+}
+
+# adding private route table to nat
+resource "aws_route" "private_route" {
+  route_table_id         = "${ aws_route_table.private_route_table.id }"
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id         = "${ aws_nat_gateway.nat.id }"
+}
+
+# associate subnet public to public route table
+resource "aws_route_table_association" "public_subnet_association" {
+  subnet_id      = "${ aws_subnet.public_subnet.id }"
+  route_table_id = "${ aws_vpc.master_vpc.main_route_table_id }"
+}
+
+# associate subnet private subnet to private route table
+resource "aws_route_table_association" "private_subnet_association" {
+  subnet_id      = "${ aws_subnet.private_subnet.id }"
+  route_table_id = "${ aws_route_table.private_route_table.id }"
 }
