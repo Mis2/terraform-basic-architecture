@@ -67,7 +67,7 @@ resource "aws_nat_gateway" "nat" {
 resource "aws_route_table" "private_route_table" {
   vpc_id = "${ aws_vpc.master_vpc.id }"
 
-  tags {
+  tags = {
     Name      = "Private Subnet Route Table"
     BuildWith = "terraform"
   }
